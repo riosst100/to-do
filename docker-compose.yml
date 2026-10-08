@@ -13,6 +13,8 @@ services:
     environment:
       APP_URL: http://localhost:${BACKEND_PORT:-8020}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:${FRONTEND_PORT:-3020}}
+      # Frontend yang login via cookie session (Sanctum SPA auth)
+      SANCTUM_STATEFUL_DOMAINS: ${SANCTUM_STATEFUL_DOMAINS:-localhost:${FRONTEND_PORT:-3020}}
       # Shared PostgreSQL from ~/projects/services (start it first).
       DB_CONNECTION: pgsql
       DB_HOST: postgres

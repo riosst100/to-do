@@ -28,6 +28,26 @@ class TodoApiTest extends TestCase
         $this->withToken($token)->postJson('/api/logout')->assertOk();
     }
 
+    public function test_spa_login_uses_session_cookie_with_remember_me(): void
+    {
+        User::factory()->create(['email' => 'rio@example.com', 'password' => 'password123']);
+        $this->withHeader('Origin', 'http://localhost:3000');
+
+        $response = $this->postJson('/api/login', ['email' => 'rio@example.com', 'password' => 'password123'])
+            ->assertOk()
+            ->assertJsonMissingPath('token');
+
+        $rememberCookie = collect($response->headers->getCookies())
+            ->first(fn ($c) => str_starts_with($c->getName(), 'remember_web_'));
+        $this->assertNotNull($rememberCookie, 'Cookie remember me harus diset');
+        $this->assertTrue($rememberCookie->isHttpOnly());
+
+        $this->getJson('/api/me')->assertOk()->assertJsonPath('user.email', 'rio@example.com');
+
+        $this->postJson('/api/logout')->assertOk();
+        $this->assertGuest('web');
+    }
+
     public function test_guest_cannot_access_todos(): void
     {
         $this->getJson('/api/todos')->assertUnauthorized();
@@ -81,6 +101,26 @@ class TodoApiTest extends TestCase
         $this->getJson("/api/todos?category_id={$cat}")->assertJsonCount(1, 'data');
         $this->getJson('/api/todos?category_id=none')->assertJsonCount(2, 'data');
         $this->getJson('/api/todos/today?date=2026-10-08')->assertJsonCount(1, 'data');
+    }
+
+    public function test_long_description_can_be_created_and_updated(): void
+    {
+        Sanctum::actingAs(User::factory()->create());
+        $long = trim(str_repeat("Baris panjang.\n", 600)); // ~9000 karakter, baris baru dipertahankan
+
+        $id = $this->postJson('/api/todos', ['title' => 'A', 'due_date' => '2026-10-08', 'description' => $long])
+            ->assertCreated()
+            ->assertJsonPath('data.description', $long)
+            ->json('data.id');
+
+        $this->patchJson("/api/todos/{$id}", ['description' => 'Ringkas'])
+            ->assertOk()
+            ->assertJsonPath('data.description', 'Ringkas')
+            ->assertJsonPath('data.title', 'A');
+
+        $this->patchJson("/api/todos/{$id}", ['description' => null])->assertJsonPath('data.description', null);
+
+        $this->patchJson("/api/todos/{$id}", ['description' => str_repeat('x', 10001)])->assertUnprocessable();
     }
 
     public function test_user_cannot_touch_other_users_data(): void

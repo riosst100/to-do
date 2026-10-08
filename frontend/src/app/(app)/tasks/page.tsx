@@ -65,7 +65,7 @@ export default function TasksPage() {
     if (userId) api.categories().then(setCategories);
   }, [userId]);
 
-  const { toggle, remove } = useTodoActions(setTodos, load);
+  const { toggle, remove, update } = useTodoActions(setTodos, load);
 
   async function handleCreate(data: TodoInput) {
     await api.createTodo(data);
@@ -191,7 +191,7 @@ export default function TasksPage() {
               </header>
               <ul className="divide-y divide-slate-100">
                 {g.todos.map((t) => (
-                  <TodoItem key={t.id} todo={t} onToggle={toggle} onDelete={remove} showCategory={false} />
+                  <TodoItem key={t.id} todo={t} onToggle={toggle} onDelete={remove} onUpdate={update} showCategory={false} />
                 ))}
               </ul>
             </section>
