@@ -59,6 +59,7 @@ class TodoApiTest extends TestCase
 
         $this->postJson('/api/todos', ['title' => 'A', 'due_date' => '2026-10-08'])
             ->assertCreated()
+            ->assertJsonPath('data.is_completed', false)
             ->assertJsonPath('data.category_id', null)
             ->assertJsonPath('data.category.name', 'Tanpa Kategori');
 

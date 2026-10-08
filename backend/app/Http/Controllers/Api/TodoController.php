@@ -57,7 +57,8 @@ class TodoController extends Controller
     {
         $todo = $request->user()->todos()->create($this->validated($request));
 
-        return (new TodoResource($todo->load('category')))->response()->setStatusCode(201);
+        // fresh(): ambil nilai default kolom dari DB (mis. is_completed = false, bukan null)
+        return (new TodoResource($todo->fresh('category')))->response()->setStatusCode(201);
     }
 
     public function show(Request $request, Todo $todo): TodoResource
