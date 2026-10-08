@@ -1,7 +1,17 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
-import { api, type User } from "./api";
+import { api, ApiError, type User } from "./api";
+
+/** Backend membalas token (bukan session) jika origin frontend tidak ada di SANCTUM_STATEFUL_DOMAINS. */
+function assertSessionLogin(r: { user: User; token?: string }) {
+  if (r.token) {
+    throw new ApiError(
+      `Login berhasil tapi cookie session tidak dibuat. Tambahkan "${window.location.host}" ke SANCTUM_STATEFUL_DOMAINS di backend.`,
+      500,
+    );
+  }
+}
 
 type AuthState = {
   user: User | null;
@@ -37,12 +47,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = useCallback(async (email: string, password: string) => {
     const r = await api.login({ email, password, remember: true });
+    assertSessionLogin(r);
     setUser(r.user);
   }, []);
 
   const register = useCallback(
     async (name: string, email: string, password: string, password_confirmation: string) => {
       const r = await api.register({ name, email, password, password_confirmation });
+      assertSessionLogin(r);
       setUser(r.user);
     },
     [],

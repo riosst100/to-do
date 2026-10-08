@@ -113,9 +113,9 @@ function query(params: Record<string, string | number | undefined>) {
 
 export const api = {
   register: (data: { name: string; email: string; password: string; password_confirmation: string }) =>
-    request<{ user: User }>("/register", { method: "POST", body: JSON.stringify(data) }),
+    request<{ user: User; token?: string }>("/register", { method: "POST", body: JSON.stringify(data) }),
   login: (data: { email: string; password: string; remember?: boolean }) =>
-    request<{ user: User }>("/login", { method: "POST", body: JSON.stringify(data) }),
+    request<{ user: User; token?: string }>("/login", { method: "POST", body: JSON.stringify(data) }),
   me: () => request<{ user: User }>("/me"),
   logout: () => request("/logout", { method: "POST" }),
 
