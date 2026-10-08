@@ -48,6 +48,11 @@ export default function LoginPage() {
           Daftar
         </Link>
       </p>
+      <p className="mt-2 text-center text-sm text-slate-500">
+        <Link href="/download" className="font-medium text-indigo-600 hover:underline">
+          Unduh aplikasi Android
+        </Link>
+      </p>
     </AuthCard>
   );
 }
