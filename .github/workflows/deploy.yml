@@ -23,8 +23,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: shivammathur/setup-php@v2
         with:
-          php-version: "8.4"  # same as php8.4-fpm on the VPS
-          extensions: pdo_sqlite, pdo_pgsql, zip, pcntl
+          php-version: "8.4"  # same as php-fpm on the VPS
+          extensions: pdo_sqlite, sqlite3, pdo_pgsql, intl, bcmath, zip
           coverage: none
       - uses: actions/cache@v4
         with:
@@ -32,8 +32,7 @@ jobs:
           key: composer-${{ hashFiles('backend/composer.lock') }}
       - run: composer install --no-interaction --prefer-dist
       - run: cp .env.example .env && php artisan key:generate
-      # phpunit.xml switches the database to in-memory SQLite
-      - run: php artisan test
+      - run: php artisan test  # phpunit.xml forces SQLite :memory:
 
   frontend:
     name: Frontend lint & build
@@ -55,7 +54,7 @@ jobs:
       - run: npm run build
         env:
           NEXT_TELEMETRY_DISABLED: 1
-          NEXT_PUBLIC_API_URL: http://localhost:8000/api
+          NEXT_PUBLIC_API_URL: https://api-todo.inovasionline.com/api
 
   deploy:
     name: Deploy to VPS
@@ -73,11 +72,7 @@ jobs:
           command_timeout: 20m
           script: |
             set -e
-            # Non-interactive SSH skips .bashrc; load nvm/pm2 if installed that way.
-            export NVM_DIR="$HOME/.nvm"; [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
             cd "${{ vars.APP_DIR || '/var/www/html/to-do' }}"
             git fetch --prune origin master
             git reset --hard origin/master
-            PM2_APP_NAME="${{ vars.PM2_APP_NAME || 'todo-web' }}" \
-            FRONTEND_PORT="${{ vars.FRONTEND_PORT || '3030' }}" \
-              bash scripts/deploy.sh
+            bash scripts/deploy.sh

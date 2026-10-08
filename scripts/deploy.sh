@@ -1,21 +1,20 @@
 #!/usr/bin/env bash
-# Production deploy on the VPS (native: nginx + php-fpm + pm2).
+# Production deploy on the VPS (nginx + php-fpm + pm2).
 # Run from the repository root after the code has been updated, e.g. by
 # .github/workflows/deploy.yml:  git reset --hard origin/master && bash scripts/deploy.sh
 #
 # Settings (environment variables, all optional):
-#   PHP_BIN          PHP binary, same version as php-fpm  (default: php8.4)
-#   COMPOSER_BIN     Composer binary                      (default: /usr/bin/composer)
-#   PHP_FPM_SERVICE  systemd unit reloaded after deploy   (default: php8.4-fpm; empty = skip)
-#                    (non-root needs passwordless sudo for `systemctl reload <unit>`)
-#   PM2_APP_NAME     pm2 process name of the Next.js app  (default: todo-web)
+#   PHP_BIN          PHP binary                       (default: php)
+#   COMPOSER_BIN     Composer binary                  (default: composer)
+#   PHP_FPM_SERVICE  systemd unit reloaded after deploy (default: php8.4-fpm); empty = skip
+#   PM2_APP_NAME     pm2 process name of the Next.js app (default: todo-web)
 #   FRONTEND_PORT    Port for `next start` on first start (default: 3030)
 #   WEB_USER         Owner of backend/storage and bootstrap/cache when deploying as root
 #                    (default: www-data, the php-fpm user)
 set -euo pipefail
 
-PHP_BIN=${PHP_BIN:-php8.4}
-COMPOSER_BIN=${COMPOSER_BIN:-/usr/bin/composer}
+PHP_BIN=${PHP_BIN:-php}
+COMPOSER_BIN=${COMPOSER_BIN:-composer}
 PHP_FPM_SERVICE=${PHP_FPM_SERVICE-php8.4-fpm}
 PM2_APP_NAME=${PM2_APP_NAME:-todo-web}
 FRONTEND_PORT=${FRONTEND_PORT:-3030}
@@ -32,7 +31,7 @@ cd "$ROOT/backend"
 [ -f .env ] || { echo "backend/.env is missing on the server" >&2; exit 1; }
 
 log "Backend: composer install"
-"$PHP_BIN" "$COMPOSER_BIN" install --no-dev --no-interaction --prefer-dist --optimize-autoloader
+"$COMPOSER_BIN" install --no-dev --no-interaction --prefer-dist --optimize-autoloader
 
 log "Backend: migrate"
 "$PHP_BIN" artisan migrate --force
@@ -40,9 +39,6 @@ log "Backend: migrate"
 log "Backend: cache config/routes/views"
 "$PHP_BIN" artisan optimize:clear
 "$PHP_BIN" artisan optimize
-
-log "Backend: restart queue workers"
-"$PHP_BIN" artisan queue:restart
 
 if [ "$(id -u)" -eq 0 ]; then
     # Files artisan just created as root (logs, caches) must stay writable for php-fpm.
