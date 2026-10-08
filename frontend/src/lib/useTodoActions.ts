@@ -1,9 +1,9 @@
 "use client";
 
 import { useCallback } from "react";
-import { api, type Todo } from "./api";
+import { api, type Todo, type TodoInput } from "./api";
 
-/** Toggle & hapus todo dengan update optimistis pada list lokal. */
+/** Toggle, edit & hapus todo dengan update optimistis pada list lokal. */
 export function useTodoActions(setTodos: React.Dispatch<React.SetStateAction<Todo[]>>, reload: () => void) {
   const toggle = useCallback(
     async (todo: Todo) => {
@@ -31,5 +31,14 @@ export function useTodoActions(setTodos: React.Dispatch<React.SetStateAction<Tod
     [setTodos, reload],
   );
 
-  return { toggle, remove };
+  /** Melempar error agar pemanggil (mis. editor deskripsi) bisa menampilkan pesan. */
+  const update = useCallback(
+    async (todo: Todo, data: Partial<TodoInput>) => {
+      const updated = await api.updateTodo(todo.id, data);
+      setTodos((list) => list.map((t) => (t.id === todo.id ? updated : t)));
+    },
+    [setTodos],
+  );
+
+  return { toggle, remove, update };
 }

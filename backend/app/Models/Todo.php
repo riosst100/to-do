@@ -10,6 +10,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 #[Fillable(['category_id', 'title', 'description', 'due_date', 'is_completed', 'completed_at'])]
 class Todo extends Model
 {
+    /** Panjang maksimum deskripsi (karakter). */
+    public const DESCRIPTION_MAX = 10000;
+
     protected function casts(): array
     {
         return [

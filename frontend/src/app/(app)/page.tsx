@@ -31,7 +31,7 @@ export default function HomePage() {
     if (userId) load();
   }, [userId, load]);
 
-  const { toggle, remove } = useTodoActions(setTodos, load);
+  const { toggle, remove, update } = useTodoActions(setTodos, load);
 
   async function handleCreate(data: TodoInput) {
     const todo = await api.createTodo(data);
@@ -70,7 +70,7 @@ export default function HomePage() {
         ) : (
           <ul className="divide-y divide-slate-100">
             {todos.map((t) => (
-              <TodoItem key={t.id} todo={t} onToggle={toggle} onDelete={remove} showDate={false} />
+              <TodoItem key={t.id} todo={t} onToggle={toggle} onDelete={remove} onUpdate={update} showDate={false} />
             ))}
           </ul>
         )}

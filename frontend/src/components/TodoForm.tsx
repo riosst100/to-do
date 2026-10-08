@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ApiError, type Category, type TodoInput } from "@/lib/api";
+import { ApiError, DESCRIPTION_MAX, type Category, type TodoInput } from "@/lib/api";
 import { useToday } from "@/lib/useToday";
 
 type Props = {
@@ -52,12 +52,18 @@ export function TodoForm({ categories, onSubmit, defaultDate, defaultCategoryId 
         onChange={(e) => setTitle(e.target.value)}
         required
       />
-      <textarea
-        className="input min-h-16 resize-y"
-        placeholder="Catatan (opsional)"
-        value={description}
-        onChange={(e) => setDescription(e.target.value)}
-      />
+      <div>
+        <textarea
+          className="input min-h-28 resize-y"
+          placeholder="Deskripsi tugas (opsional) — detail, langkah-langkah, tautan, dll."
+          value={description}
+          maxLength={DESCRIPTION_MAX}
+          onChange={(e) => setDescription(e.target.value)}
+        />
+        <p className="mt-1 text-right text-xs text-slate-400">
+          {description.length.toLocaleString("id-ID")}/{DESCRIPTION_MAX.toLocaleString("id-ID")}
+        </p>
+      </div>
       <div className="flex flex-col gap-3 sm:flex-row">
         <select className="input sm:w-auto sm:flex-1" value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
           <option value="">Tanpa Kategori</option>

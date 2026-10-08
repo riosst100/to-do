@@ -103,7 +103,7 @@ class TodoController extends Controller
 
         return $request->validate([
             'title' => [$required, 'string', 'max:255'],
-            'description' => ['nullable', 'string', 'max:2000'],
+            'description' => ['nullable', 'string', 'max:'.Todo::DESCRIPTION_MAX],
             'due_date' => [$required, 'date_format:Y-m-d'],
             // null / kosong = Tanpa Kategori
             'category_id' => [

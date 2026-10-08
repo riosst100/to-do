@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\ValidationException;
@@ -23,10 +24,7 @@ class AuthController extends Controller
 
         $user = User::create($data);
 
-        return response()->json([
-            'user' => $user,
-            'token' => $user->createToken($data['device_name'] ?? 'web')->plainTextToken,
-        ], 201);
+        return $this->authenticated($request, $user, $data['device_name'] ?? null, 201);
     }
 
     public function login(Request $request): JsonResponse
@@ -35,6 +33,7 @@ class AuthController extends Controller
             'email' => ['required', 'email'],
             'password' => ['required', 'string'],
             'device_name' => ['nullable', 'string', 'max:100'],
+            'remember' => ['nullable', 'boolean'],
         ]);
 
         $user = User::where('email', $data['email'])->first();
@@ -45,10 +44,7 @@ class AuthController extends Controller
             ]);
         }
 
-        return response()->json([
-            'user' => $user,
-            'token' => $user->createToken($data['device_name'] ?? 'web')->plainTextToken,
-        ]);
+        return $this->authenticated($request, $user, $data['device_name'] ?? null, remember: $request->boolean('remember', true));
     }
 
     public function me(Request $request): JsonResponse
@@ -58,8 +54,33 @@ class AuthController extends Controller
 
     public function logout(Request $request): JsonResponse
     {
-        $request->user()->currentAccessToken()->delete();
+        if ($request->hasSession()) {
+            Auth::guard('web')->logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+        } else {
+            $request->user()->currentAccessToken()->delete();
+        }
 
         return response()->json(['message' => 'Berhasil logout.']);
+    }
+
+    /**
+     * SPA (domain stateful) → login via session cookie + cookie "remember me" agar tidak perlu login ulang.
+     * Klien lain (mis. mobile) → bearer token.
+     */
+    private function authenticated(Request $request, User $user, ?string $deviceName, int $status = 200, bool $remember = true): JsonResponse
+    {
+        if ($request->hasSession()) {
+            Auth::guard('web')->login($user, $remember);
+            $request->session()->regenerate();
+
+            return response()->json(['user' => $user], $status);
+        }
+
+        return response()->json([
+            'user' => $user,
+            'token' => $user->createToken($deviceName ?? 'web')->plainTextToken,
+        ], $status);
     }
 }

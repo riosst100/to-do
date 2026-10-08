@@ -1,7 +1,17 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
-import { api, getToken, setToken, type User } from "./api";
+import { api, ApiError, type User } from "./api";
+
+/** Backend membalas token (bukan session) jika origin frontend tidak ada di SANCTUM_STATEFUL_DOMAINS. */
+function assertSessionLogin(r: { user: User; token?: string }) {
+  if (r.token) {
+    throw new ApiError(
+      `Login berhasil tapi cookie session tidak dibuat. Tambahkan "${window.location.host}" ke SANCTUM_STATEFUL_DOMAINS di backend.`,
+      500,
+    );
+  }
+}
 
 type AuthState = {
   user: User | null;
@@ -18,13 +28,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const restore = getToken()
-      ? api
-          .me()
-          .then((r) => setUser(r.user))
-          .catch(() => setToken(null))
-      : Promise.resolve();
-    restore.finally(() => setLoading(false));
+    // Bersihkan token lama dari versi sebelumnya (sekarang pakai cookie session)
+    try {
+      localStorage.removeItem("todo_token");
+    } catch {}
+
+    // Session cookie dikirim otomatis; 401 berarti belum login
+    api
+      .me()
+      .then((r) => setUser(r.user))
+      .catch(() => setUser(null))
+      .finally(() => setLoading(false));
 
     const onUnauthorized = () => setUser(null);
     window.addEventListener("auth:unauthorized", onUnauthorized);
@@ -32,15 +46,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const login = useCallback(async (email: string, password: string) => {
-    const r = await api.login({ email, password });
-    setToken(r.token);
+    const r = await api.login({ email, password, remember: true });
+    assertSessionLogin(r);
     setUser(r.user);
   }, []);
 
   const register = useCallback(
     async (name: string, email: string, password: string, password_confirmation: string) => {
       const r = await api.register({ name, email, password, password_confirmation });
-      setToken(r.token);
+      assertSessionLogin(r);
       setUser(r.user);
     },
     [],
@@ -48,7 +62,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = useCallback(async () => {
     await api.logout().catch(() => {});
-    setToken(null);
     setUser(null);
   }, []);
 

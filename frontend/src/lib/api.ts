@@ -1,6 +1,7 @@
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api";
 
-const TOKEN_KEY = "todo_token";
+// Origin backend (tanpa /api), untuk endpoint /sanctum/csrf-cookie
+const BACKEND_URL = API_URL.replace(/\/api\/?$/, "");
 
 export type User = { id: number; name: string; email: string };
 
@@ -22,6 +23,9 @@ export type Todo = {
   category_id: number | null;
   category: { id: number | null; name: string; color: string };
 };
+
+/** Sama dengan Todo::DESCRIPTION_MAX di backend. */
+export const DESCRIPTION_MAX = 10000;
 
 export type TodoInput = {
   title: string;
@@ -49,33 +53,48 @@ export class ApiError extends Error {
   }
 }
 
-export function getToken(): string | null {
-  if (typeof window === "undefined") return null;
-  return localStorage.getItem(TOKEN_KEY);
+/*
+ * Autentikasi pakai cookie session Laravel Sanctum (HttpOnly + remember me), bukan token di localStorage,
+ * jadi login bertahan walau tab/browser ditutup. Request yang mengubah data butuh header X-XSRF-TOKEN
+ * yang dibaca dari cookie XSRF-TOKEN (diset oleh /sanctum/csrf-cookie).
+ */
+function readXsrfToken(): string | null {
+  if (typeof document === "undefined") return null;
+  const match = document.cookie.match(/(?:^|; )XSRF-TOKEN=([^;]*)/);
+  return match ? decodeURIComponent(match[1]) : null;
 }
 
-export function setToken(token: string | null) {
-  if (token) localStorage.setItem(TOKEN_KEY, token);
-  else localStorage.removeItem(TOKEN_KEY);
+export async function ensureCsrfCookie(force = false) {
+  if (!force && readXsrfToken()) return;
+  await fetch(`${BACKEND_URL}/sanctum/csrf-cookie`, { credentials: "include" });
 }
 
-async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const token = getToken();
+async function request<T>(path: string, init: RequestInit = {}, retried = false): Promise<T> {
+  const method = (init.method ?? "GET").toUpperCase();
+  if (method !== "GET") await ensureCsrfCookie();
+  const xsrf = readXsrfToken();
+
   const res = await fetch(`${API_URL}${path}`, {
     ...init,
+    credentials: "include",
     headers: {
       Accept: "application/json",
       "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(xsrf ? { "X-XSRF-TOKEN": xsrf } : {}),
       ...init.headers,
     },
   });
+
+  // 419 = token CSRF kedaluwarsa (mis. session habis) → ambil ulang lalu coba sekali lagi
+  if (res.status === 419 && !retried) {
+    await ensureCsrfCookie(true);
+    return request<T>(path, init, true);
+  }
 
   const body = res.status === 204 ? null : await res.json().catch(() => null);
 
   if (!res.ok) {
     if (res.status === 401) {
-      setToken(null);
       window.dispatchEvent(new Event("auth:unauthorized"));
     }
     throw new ApiError(body?.message ?? "Terjadi kesalahan.", res.status, body?.errors ?? {});
@@ -94,9 +113,9 @@ function query(params: Record<string, string | number | undefined>) {
 
 export const api = {
   register: (data: { name: string; email: string; password: string; password_confirmation: string }) =>
-    request<{ user: User; token: string }>("/register", { method: "POST", body: JSON.stringify(data) }),
-  login: (data: { email: string; password: string }) =>
-    request<{ user: User; token: string }>("/login", { method: "POST", body: JSON.stringify(data) }),
+    request<{ user: User; token?: string }>("/register", { method: "POST", body: JSON.stringify(data) }),
+  login: (data: { email: string; password: string; remember?: boolean }) =>
+    request<{ user: User; token?: string }>("/login", { method: "POST", body: JSON.stringify(data) }),
   me: () => request<{ user: User }>("/me"),
   logout: () => request("/logout", { method: "POST" }),
 
@@ -110,6 +129,8 @@ export const api = {
   todayTodos: (date: string) => request<{ data: Todo[] }>(`/todos/today${query({ date })}`).then((r) => r.data),
   createTodo: (data: TodoInput) =>
     request<{ data: Todo }>("/todos", { method: "POST", body: JSON.stringify(data) }).then((r) => r.data),
+  updateTodo: (id: number, data: Partial<TodoInput>) =>
+    request<{ data: Todo }>(`/todos/${id}`, { method: "PATCH", body: JSON.stringify(data) }).then((r) => r.data),
   toggleTodo: (id: number) =>
     request<{ data: Todo }>(`/todos/${id}/toggle`, { method: "PATCH" }).then((r) => r.data),
   deleteTodo: (id: number) => request(`/todos/${id}`, { method: "DELETE" }),
